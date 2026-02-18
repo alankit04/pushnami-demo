@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pushnami Landing</title>
+    <style>
+      :root {
+        --bg: #050816;
+        --panel: rgba(17, 24, 39, 0.78);
+        --panel-strong: rgba(15, 23, 42, 0.94);
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --accent: #6366f1;
+        --accent-2: #22d3ee;
+        --success: #10b981;
+        --border: rgba(148, 163, 184, 0.2);
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: var(--text);
+        background: radial-gradient(1200px 700px at 10% -10%, #312e81 0%, transparent 45%),
+          radial-gradient(1000px 700px at 110% 10%, #0e7490 0%, transparent 38%),
+          var(--bg);
+      }
+
+      .container { width: min(980px, 92vw); margin: 2rem auto 4rem; }
+      .hero {
+        background: linear-gradient(150deg, rgba(99,102,241,0.22), rgba(34,211,238,0.14));
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 2.5rem;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.45);
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::after {
+        content: "";
+        position: absolute;
+        width: 420px;
+        height: 420px;
+        right: -160px;
+        top: -180px;
+        background: radial-gradient(circle, rgba(99,102,241,0.55), transparent 65%);
+        filter: blur(5px);
+      }
+      h1 { margin: 0 0 0.8rem; font-size: clamp(1.8rem, 4.3vw, 3rem); line-height: 1.15; }
+      .subtitle { color: var(--muted); margin: 0; max-width: 64ch; }
+
+      .badge {
+        margin-top: 1rem;
+        display: inline-flex;
+        gap: 0.45rem;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(2, 6, 23, 0.62);
+        padding: 0.35rem 0.8rem;
+        font-size: 0.9rem;
+      }
+
+      .grid {
+        margin-top: 1.4rem;
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        border-radius: 18px;
+        padding: 1.1rem 1rem;
+        backdrop-filter: blur(9px);
+        transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+      }
+      .card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(99,102,241,0.55);
+        box-shadow: 0 16px 35px rgba(2, 6, 23, 0.45);
+      }
+
+      section {
+        margin-top: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--panel-strong);
+        padding: 1.2rem;
+      }
+      section h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
+      section p { color: var(--muted); margin: 0 0 0.9rem; }
+
+      .btn {
+        border: none;
+        border-radius: 12px;
+        padding: 0.8rem 1.1rem;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(90deg, #4f46e5, #06b6d4);
+        cursor: pointer;
+        transition: transform .18s ease, filter .18s ease, box-shadow .2s ease;
+        box-shadow: 0 12px 30px rgba(79,70,229,0.32);
+      }
+      .btn:hover { transform: translateY(-2px); filter: brightness(1.05); }
+      .btn:active { transform: translateY(0); }
+
+      .form-row {
+        display: flex;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+      }
+      input[type="email"] {
+        flex: 1;
+        min-width: 220px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(2, 6, 23, 0.65);
+        color: var(--text);
+        padding: 0.8rem;
+      }
+
+      .message {
+        margin-top: 0.75rem;
+        color: #bbf7d0;
+        font-size: 0.95rem;
+      }
+
+      .hidden { display: none !important; }
+
+      .fade-in {
+        opacity: 0;
+        transform: translateY(10px);
+        animation: rise .5s ease forwards;
+      }
+      .delay-1 { animation-delay: .08s; }
+      .delay-2 { animation-delay: .16s; }
+      .delay-3 { animation-delay: .24s; }
+      @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+      .toast {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        border: 1px solid rgba(16,185,129,.45);
+        background: rgba(6, 78, 59, .95);
+        color: #d1fae5;
+        border-radius: 12px;
+        padding: .7rem .9rem;
+        font-size: .9rem;
+        box-shadow: 0 15px 30px rgba(0,0,0,.35);
+        transform: translateY(30px);
+        opacity: 0;
+        pointer-events: none;
+        transition: all .22s ease;
+      }
+      .toast.show { transform: translateY(0); opacity: 1; }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; transition: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero fade-in">
+        <h1 id="headline">Welcome to the smarter growth engine</h1>
+        <p id="valueProp" class="subtitle">Fast setup, measurable results, and no code required.</p>
+        <p class="badge">Variant <strong id="variant">loading…</strong></p>
+
+        <div class="grid">
+          <article class="card fade-in delay-1" id="promoSection">
+            <h3>Limited-time offer</h3>
+            <p id="promoCopy">Save 20% when you sign up today.</p>
+          </article>
+          <article class="card fade-in delay-2">
+            <h3>Action</h3>
+            <a id="ctaLink" href="https://example.com/start" target="_blank" rel="noreferrer">
+              <button class="btn" id="ctaBtn">Start Free Trial</button>
+            </a>
+          </article>
+        </div>
+      </header>
+
+      <section id="signupSection" class="fade-in delay-3">
+        <h2>Request a demo</h2>
+        <p>Talk to our team and get custom recommendations based on your use-case.</p>
+        <form id="signupForm" class="form-row">
+          <input type="email" name="email" placeholder="email@example.com" required />
+          <button class="btn" type="submit">Submit</button>
+        </form>
+        <p id="formMessage" class="message"></p>
+      </section>
+    </main>
+
+    <div id="toast" class="toast">Event tracked</div>
+
+    <script>
+      const AB_URL = 'http://localhost:5002';
+      const METRICS_URL = 'http://localhost:5001';
+      const toast = document.getElementById('toast');
+
+      function showToast(text) {
+        toast.textContent = text;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 1300);
+      }
+
+      function getVisitorId() {
+        const existing = localStorage.getItem('visitorId');
+        if (existing) return existing;
+        const generated = crypto.randomUUID();
+        localStorage.setItem('visitorId', generated);
+        return generated;
+      }
+
+      async function trackEvent(eventType, variant, metadata = {}) {
+        await fetch(`${METRICS_URL}/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visitor_id: getVisitorId(), variant, event_type: eventType, metadata }),
+        });
+      }
+
+      async function init() {
+        const visitorId = getVisitorId();
+        const [assignmentRes, configRes] = await Promise.all([
+          fetch(`${AB_URL}/assign?visitor_id=${encodeURIComponent(visitorId)}`),
+          fetch(`${AB_URL}/config`),
+        ]);
+
+        const assignment = await assignmentRes.json();
+        const config = await configRes.json();
+        const variant = assignment.variant;
+        document.getElementById('variant').textContent = variant;
+
+        if (variant === 'B') {
+          document.getElementById('headline').textContent = 'Grow engagement with seamless behavioral intelligence';
+          document.getElementById('valueProp').textContent = 'Built for fast-moving teams that optimize every click and conversion path.';
+          document.getElementById('ctaBtn').textContent = 'See Live Demo';
+          document.getElementById('promoCopy').textContent = 'Unlock premium onboarding support and guided activation this month.';
+        }
+
+        if (!config.showPromoSection) document.getElementById('promoSection').classList.add('hidden');
+        if (!config.enableSignupForm) document.getElementById('signupSection').classList.add('hidden');
+        if (config.alternateCtaDestination) document.getElementById('ctaLink').href = 'https://example.com/pricing';
+
+        await trackEvent('page_view', variant);
+
+        document.getElementById('ctaBtn').addEventListener('click', async () => {
+          await trackEvent('cta_click', variant);
+          showToast('CTA click tracked');
+        });
+
+        const form = document.getElementById('signupForm');
+        if (form) {
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = new FormData(e.target).get('email');
+            document.getElementById('formMessage').textContent = 'Thanks! We will reach out shortly.';
+            await trackEvent('form_submit', variant, { email });
+            showToast('Form submit tracked');
+            e.target.reset();
+          });
+        }
+      }
+
+      init().catch((error) => {
+        console.error('Initialization failed', error);
+        document.body.insertAdjacentHTML('beforeend', '<p style="text-align:center;color:#fecaca;">Service temporarily unavailable.</p>');
+      });
+    </script>
+  </body>
+</html>
