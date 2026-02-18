@@ -1,0 +1,43 @@
+version: '3.9'
+services:
+  ab-service:
+    build: ./ab-service
+    container_name: ab-service
+    ports:
+      - '5002:5002'
+    volumes:
+      - ab_data:/data
+    restart: unless-stopped
+
+  metrics-service:
+    build: ./metrics-service
+    container_name: metrics-service
+    ports:
+      - '5001:5001'
+    volumes:
+      - metrics_data:/data
+    restart: unless-stopped
+
+  landing-service:
+    build: ./landing-service
+    container_name: landing-service
+    depends_on:
+      - ab-service
+      - metrics-service
+    ports:
+      - '8080:8080'
+    restart: unless-stopped
+
+  admin-app:
+    build: ./admin-app
+    container_name: admin-app
+    depends_on:
+      - ab-service
+      - metrics-service
+    ports:
+      - '8081:8081'
+    restart: unless-stopped
+
+volumes:
+  ab_data:
+  metrics_data:
