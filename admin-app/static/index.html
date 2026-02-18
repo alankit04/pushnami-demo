@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard</title>
+    <style>
+      :root {
+        --bg: #020617;
+        --panel: #0f172a;
+        --panel-soft: rgba(30, 41, 59, 0.5);
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #22d3ee;
+        --accent2: #8b5cf6;
+        --ok: #10b981;
+        --border: rgba(148, 163, 184, 0.24);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: var(--text);
+        background: radial-gradient(1000px 650px at 0% 0%, #0f172a 0%, transparent 60%), var(--bg);
+      }
+      .container { width: min(1100px, 92vw); margin: 2rem auto 3rem; }
+      h1 { margin: 0 0 1rem; font-size: clamp(1.7rem, 3.4vw, 2.5rem); }
+      .sub { color: var(--muted); margin: 0 0 1.4rem; }
+      .layout { display: grid; grid-template-columns: 360px 1fr; gap: 1rem; }
+      @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: linear-gradient(170deg, rgba(15,23,42,.94), rgba(15,23,42,.7));
+        padding: 1rem;
+      }
+
+      .toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: .6rem .7rem;
+        margin-bottom: .6rem;
+        background: var(--panel-soft);
+      }
+
+      .switch {
+        appearance: none;
+        width: 46px;
+        height: 26px;
+        background: #334155;
+        border-radius: 999px;
+        position: relative;
+        cursor: pointer;
+        transition: background .2s ease;
+      }
+      .switch::after {
+        content: '';
+        position: absolute;
+        left: 3px;
+        top: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        transition: transform .2s ease;
+      }
+      .switch:checked { background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+      .switch:checked::after { transform: translateX(20px); }
+
+      button {
+        border: 0;
+        border-radius: 12px;
+        padding: .72rem 1rem;
+        font-weight: 700;
+        color: white;
+        background: linear-gradient(90deg, #7c3aed, #06b6d4);
+        cursor: pointer;
+      }
+      .status { font-size: .9rem; color: #bbf7d0; min-height: 1.2rem; margin-top: .5rem; }
+
+      .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .7rem; margin-bottom: .8rem; }
+      .metric {
+        border: 1px solid var(--border);
+        background: var(--panel-soft);
+        border-radius: 12px;
+        padding: .7rem;
+      }
+      .metric .k { color: var(--muted); font-size: .8rem; margin-bottom: .3rem; }
+      .metric .v { font-size: 1.4rem; font-weight: 700; }
+
+      pre {
+        margin: 0;
+        background: #020617;
+        color: #cbd5e1;
+        border: 1px solid rgba(148,163,184,.22);
+        border-radius: 12px;
+        padding: .9rem;
+        max-height: 380px;
+        overflow: auto;
+        font-size: .84rem;
+      }
+
+      .fade { animation: fade .35s ease; }
+      @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0);} }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Admin Controls</h1>
+      <p class="sub">Manage feature exposure and monitor experiment performance in real-time.</p>
+
+      <div class="layout">
+        <section class="panel fade">
+          <h2>Feature Toggles</h2>
+          <div class="toggle"><label for="experimentEnabled">Enable experiment assignment</label><input id="experimentEnabled" class="switch" type="checkbox" /></div>
+          <div class="toggle"><label for="showPromoSection">Show promo section</label><input id="showPromoSection" class="switch" type="checkbox" /></div>
+          <div class="toggle"><label for="enableSignupForm">Show signup form</label><input id="enableSignupForm" class="switch" type="checkbox" /></div>
+          <div class="toggle"><label for="alternateCtaDestination">Use alternate CTA destination</label><input id="alternateCtaDestination" class="switch" type="checkbox" /></div>
+          <button id="saveBtn">Save Changes</button>
+          <p id="saveStatus" class="status"></p>
+        </section>
+
+        <section class="panel fade">
+          <h2>Stats Dashboard</h2>
+          <div class="metrics">
+            <div class="metric"><div class="k">Total Events</div><div id="totalEvents" class="v">0</div></div>
+            <div class="metric"><div class="k">Variant A Events</div><div id="aEvents" class="v">0</div></div>
+            <div class="metric"><div class="k">Variant B Events</div><div id="bEvents" class="v">0</div></div>
+          </div>
+          <button id="refreshStatsBtn">Refresh Stats</button>
+          <pre id="statsOutput">Loading...</pre>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const AB_URL = 'http://localhost:5002';
+      const METRICS_URL = 'http://localhost:5001';
+      const fields = ['experimentEnabled', 'showPromoSection', 'enableSignupForm', 'alternateCtaDestination'];
+
+      async function loadConfig() {
+        const res = await fetch(`${AB_URL}/admin/config`);
+        const config = await res.json();
+        fields.forEach((k) => { document.getElementById(k).checked = !!config[k]; });
+      }
+
+      async function saveConfig() {
+        const payload = fields.reduce((acc, key) => {
+          acc[key] = document.getElementById(key).checked;
+          return acc;
+        }, {});
+
+        const res = await fetch(`${AB_URL}/admin/config`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+
+        document.getElementById('saveStatus').textContent = res.ok ? 'Configuration saved' : 'Failed to save config';
+      }
+
+      function updateSummary(stats) {
+        const totals = stats.totalsByVariant || [];
+        const byVariant = Object.fromEntries(totals.map((x) => [x.variant, x.count]));
+        const totalEvents = totals.reduce((sum, x) => sum + x.count, 0);
+        document.getElementById('totalEvents').textContent = totalEvents;
+        document.getElementById('aEvents').textContent = byVariant.A || 0;
+        document.getElementById('bEvents').textContent = byVariant.B || 0;
+      }
+
+      async function loadStats() {
+        const res = await fetch(`${METRICS_URL}/stats`);
+        const stats = await res.json();
+        updateSummary(stats);
+        document.getElementById('statsOutput').textContent = JSON.stringify(stats, null, 2);
+      }
+
+      document.getElementById('saveBtn').addEventListener('click', () => {
+        saveConfig().catch((err) => {
+          console.error(err);
+          document.getElementById('saveStatus').textContent = 'Error while saving';
+        });
+      });
+
+      document.getElementById('refreshStatsBtn').addEventListener('click', () => {
+        loadStats().catch((err) => {
+          console.error(err);
+          document.getElementById('statsOutput').textContent = 'Failed to load stats';
+        });
+      });
+
+      Promise.all([loadConfig(), loadStats()]).catch((err) => {
+        console.error(err);
+        document.body.insertAdjacentHTML('beforeend', '<p style="text-align:center;color:#fecaca;">Unable to connect to backend services.</p>');
+      });
+    </script>
+  </body>
+</html>
