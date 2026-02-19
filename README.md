@@ -67,3 +67,46 @@ docker compose up --build
 
 - CORS is intentionally open for local multi-origin development.
 - Assignment persistence means changing `experimentEnabled` does not rewrite existing users; it affects new assignments.
+
+## How to test (review checklist)
+
+### 1) Start with Docker Compose
+```bash
+docker compose up --build
+```
+
+### 2) Verify services are healthy
+```bash
+curl -sS http://localhost:5002/health
+curl -sS http://localhost:5001/health
+```
+
+### 3) Validate assignment consistency
+```bash
+curl -sS "http://localhost:5002/assign?visitor_id=test-user-42"
+curl -sS "http://localhost:5002/assign?visitor_id=test-user-42"
+```
+Both responses should return the same `variant` for the same `visitor_id`.
+
+### 4) Validate metrics ingestion + filterable stats
+```bash
+curl -sS -X POST http://localhost:5001/events \
+  -H "Content-Type: application/json" \
+  -d '{"visitor_id":"test-user-42","variant":"A","event_type":"page_view"}'
+
+curl -sS "http://localhost:5001/stats"
+curl -sS "http://localhost:5001/stats?variant=A"
+curl -sS "http://localhost:5001/stats?event_type=page_view"
+```
+
+### 5) End-to-end UI validation
+- Open `http://localhost:8080` and confirm:
+  - Variant badge updates from loading state
+  - Variant-specific copy changes between A/B visitors
+  - Use **Choose variant for demo** controls to force A/B selection when needed
+  - CTA click and form submit track events
+- Open `http://localhost:8081` and confirm:
+  - Feature toggles persist via **Save Changes**
+  - Stats dashboard updates
+  - Variant/Event Type filters change the displayed stats
+

@@ -3,6 +3,11 @@ import os
 import sqlite3
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
+
+DB_PATH = os.getenv("DB_PATH", "/data/metrics.sqlite")
+PORT = int(os.getenv("PORT", "5001"))
+MAX_EVENTS_RESPONSE = int(os.getenv("MAX_EVENTS_RESPONSE", "200"))
 from urllib.parse import urlparse
 
 DB_PATH = os.getenv("DB_PATH", "/data/metrics.sqlite")
@@ -33,23 +38,68 @@ def init_db():
         conn.commit()
 
 
+def build_filters(query):
+    clauses = []
+    params = []
+    variant = (query.get("variant", [""])[0]).strip()
+    event_type = (query.get("event_type", [""])[0]).strip()
+
+    if variant:
+        clauses.append("variant = ?")
+        params.append(variant)
+    if event_type:
+        clauses.append("event_type = ?")
+        params.append(event_type)
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    return where_sql, params, variant, event_type
+
+
+def compute_stats(query):
+    where_sql, params, variant_filter, event_type_filter = build_filters(query)
+
 def compute_stats():
     with closing(get_conn()) as conn:
         by_variant = [
             dict(row)
             for row in conn.execute(
+                f"SELECT variant, COUNT(*) AS count FROM events {where_sql} GROUP BY variant ORDER BY variant",
+                params,
                 "SELECT variant, COUNT(*) AS count FROM events GROUP BY variant ORDER BY variant"
             ).fetchall()
         ]
         by_event = [
             dict(row)
             for row in conn.execute(
+                f"SELECT event_type, COUNT(*) AS count FROM events {where_sql} GROUP BY event_type ORDER BY event_type",
+                params,
                 "SELECT event_type, COUNT(*) AS count FROM events GROUP BY event_type ORDER BY event_type"
             ).fetchall()
         ]
         matrix = [
             dict(row)
             for row in conn.execute(
+                f"""
+                SELECT variant, event_type, COUNT(*) AS count
+                FROM events
+                {where_sql}
+                GROUP BY variant, event_type
+                ORDER BY variant, event_type
+                """,
+                params,
+            ).fetchall()
+        ]
+        recent = [
+            dict(row)
+            for row in conn.execute(
+                f"""
+                SELECT id, visitor_id, variant, event_type, metadata, created_at
+                FROM events
+                {where_sql}
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                [*params, MAX_EVENTS_RESPONSE],
                 """
                 SELECT variant, event_type, COUNT(*) AS count
                 FROM events
@@ -80,10 +130,15 @@ def compute_stats():
         )
 
     return {
+        "filters": {
+            "variant": variant_filter or None,
+            "event_type": event_type_filter or None,
+        },
         "totalsByVariant": by_variant,
         "totalsByEventType": by_event,
         "variantEventBreakdown": matrix,
         "conversion": conversion,
+        "recentEvents": recent,
     }
 
 
@@ -111,6 +166,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/health":
             return self._send_json(200, {"status": "ok"})
         if parsed.path == "/stats":
+            query = parse_qs(parsed.query)
+            return self._send_json(200, compute_stats(query))
             return self._send_json(200, compute_stats())
         return self._send_json(404, {"error": "not found"})
 
@@ -134,6 +191,9 @@ class Handler(BaseHTTPRequestHandler):
             conn.execute(
                 "INSERT INTO events(visitor_id, variant, event_type, metadata) VALUES (?, ?, ?, ?)",
                 (
+                    str(payload["visitor_id"]).strip(),
+                    str(payload["variant"]).strip(),
+                    str(payload["event_type"]).strip(),
                     payload["visitor_id"],
                     payload["variant"],
                     payload["event_type"],

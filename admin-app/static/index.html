@@ -126,6 +126,21 @@
 
         <section class="panel fade">
           <h2>Stats Dashboard</h2>
+          <div class="toggle" style="gap:.6rem;justify-content:flex-start;flex-wrap:wrap;">
+            <label for="variantFilter">Variant</label>
+            <select id="variantFilter" style="background:#020617;color:#e2e8f0;border:1px solid rgba(148,163,184,.3);border-radius:10px;padding:.4rem .5rem;">
+              <option value="">All</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+            </select>
+            <label for="eventTypeFilter">Event Type</label>
+            <select id="eventTypeFilter" style="background:#020617;color:#e2e8f0;border:1px solid rgba(148,163,184,.3);border-radius:10px;padding:.4rem .5rem;">
+              <option value="">All</option>
+              <option value="page_view">page_view</option>
+              <option value="cta_click">cta_click</option>
+              <option value="form_submit">form_submit</option>
+            </select>
+          </div>
           <div class="metrics">
             <div class="metric"><div class="k">Total Events</div><div id="totalEvents" class="v">0</div></div>
             <div class="metric"><div class="k">Variant A Events</div><div id="aEvents" class="v">0</div></div>
@@ -170,6 +185,18 @@
         document.getElementById('bEvents').textContent = byVariant.B || 0;
       }
 
+      function getStatsFilters() {
+        const variant = document.getElementById('variantFilter').value;
+        const eventType = document.getElementById('eventTypeFilter').value;
+        const query = new URLSearchParams();
+        if (variant) query.set('variant', variant);
+        if (eventType) query.set('event_type', eventType);
+        const queryString = query.toString();
+        return queryString ? `?${queryString}` : '';
+      }
+
+      async function loadStats() {
+        const res = await fetch(`${METRICS_URL}/stats${getStatsFilters()}`);
       async function loadStats() {
         const res = await fetch(`${METRICS_URL}/stats`);
         const stats = await res.json();
@@ -189,6 +216,14 @@
           console.error(err);
           document.getElementById('statsOutput').textContent = 'Failed to load stats';
         });
+      });
+
+      document.getElementById('variantFilter').addEventListener('change', () => {
+        loadStats().catch(() => {});
+      });
+
+      document.getElementById('eventTypeFilter').addEventListener('change', () => {
+        loadStats().catch(() => {});
       });
 
       Promise.all([loadConfig(), loadStats()]).catch((err) => {

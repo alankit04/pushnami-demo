@@ -107,6 +107,13 @@
       }
       .btn:hover { transform: translateY(-2px); filter: brightness(1.05); }
       .btn:active { transform: translateY(0); }
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid rgba(148,163,184,.45);
+        color: #dbeafe;
+        box-shadow: none;
+      }
+      .btn-secondary:hover { border-color: rgba(34,211,238,.6); }
 
       .form-row {
         display: flex;
@@ -170,6 +177,12 @@
         <h1 id="headline">Welcome to the smarter growth engine</h1>
         <p id="valueProp" class="subtitle">Fast setup, measurable results, and no code required.</p>
         <p class="badge">Variant <strong id="variant">loading…</strong></p>
+        <div style="margin-top:.8rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <span style="font-size:.9rem;color:var(--muted);">Choose variant for demo:</span>
+          <button class="btn btn-secondary" id="variantABtn" type="button">Use Variant A</button>
+          <button class="btn btn-secondary" id="variantBBtn" type="button">Use Variant B</button>
+          <button class="btn btn-secondary" id="variantAutoBtn" type="button">Auto Assign</button>
+        </div>
 
         <div class="grid">
           <article class="card fade-in delay-1" id="promoSection">
@@ -178,6 +191,14 @@
           </article>
           <article class="card fade-in delay-2">
             <h3>Action</h3>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+              <a id="ctaLink" href="https://example.com/start" target="_blank" rel="noreferrer">
+                <button class="btn" id="ctaBtn">Start Free Trial</button>
+              </a>
+              <a id="adminLink" href="http://localhost:8081" target="_blank" rel="noreferrer">
+                <button class="btn btn-secondary" id="adminBtn" type="button">Open Admin Dashboard</button>
+              </a>
+            </div>
             <a id="ctaLink" href="https://example.com/start" target="_blank" rel="noreferrer">
               <button class="btn" id="ctaBtn">Start Free Trial</button>
             </a>
@@ -209,6 +230,17 @@
         setTimeout(() => toast.classList.remove('show'), 1300);
       }
 
+      function getPreferredVariant() {
+        return localStorage.getItem('preferredVariant') || "";
+      }
+
+      function setPreferredVariant(value) {
+        if (value) localStorage.setItem('preferredVariant', value);
+        else localStorage.removeItem('preferredVariant');
+        localStorage.removeItem('visitorId');
+        location.reload();
+      }
+
       function getVisitorId() {
         const existing = localStorage.getItem('visitorId');
         if (existing) return existing;
@@ -228,6 +260,7 @@
       async function init() {
         const visitorId = getVisitorId();
         const [assignmentRes, configRes] = await Promise.all([
+          fetch(`${AB_URL}/assign?visitor_id=${encodeURIComponent(visitorId)}${getPreferredVariant() ? `&preferred_variant=${getPreferredVariant()}` : ""}`),
           fetch(`${AB_URL}/assign?visitor_id=${encodeURIComponent(visitorId)}`),
           fetch(`${AB_URL}/config`),
         ]);
@@ -250,9 +283,18 @@
 
         await trackEvent('page_view', variant);
 
+        document.getElementById('variantABtn').addEventListener('click', () => setPreferredVariant('A'));
+        document.getElementById('variantBBtn').addEventListener('click', () => setPreferredVariant('B'));
+        document.getElementById('variantAutoBtn').addEventListener('click', () => setPreferredVariant(''));
+
         document.getElementById('ctaBtn').addEventListener('click', async () => {
           await trackEvent('cta_click', variant);
           showToast('CTA click tracked');
+        });
+
+        document.getElementById('adminBtn').addEventListener('click', async () => {
+          await trackEvent('admin_nav_click', variant);
+          showToast('Opening admin dashboard');
         });
 
         const form = document.getElementById('signupForm');

@@ -95,6 +95,11 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/assign":
             query = parse_qs(parsed.query)
             visitor_id = (query.get("visitor_id", [""])[0]).strip()
+            preferred_variant = (query.get("preferred_variant", [""])[0]).strip().upper()
+            if not visitor_id:
+                return self._send_json(400, {"error": "visitor_id is required"})
+            if preferred_variant and preferred_variant not in {"A", "B"}:
+                return self._send_json(400, {"error": "preferred_variant must be A or B"})
             if not visitor_id:
                 return self._send_json(400, {"error": "visitor_id is required"})
 
@@ -107,6 +112,14 @@ class Handler(BaseHTTPRequestHandler):
                 if row:
                     variant = row["variant"]
                 else:
+                    if preferred_variant in {"A", "B"}:
+                        variant = preferred_variant
+                    else:
+                        variant = (
+                            "A"
+                            if not cfg.get("experimentEnabled", True)
+                            else choose_variant(visitor_id)
+                        )
                     variant = (
                         "A"
                         if not cfg.get("experimentEnabled", True)
@@ -124,6 +137,7 @@ class Handler(BaseHTTPRequestHandler):
                     "visitor_id": visitor_id,
                     "variant": variant,
                     "experimentEnabled": cfg.get("experimentEnabled", True),
+                    "preferredVariantApplied": bool(preferred_variant in {"A", "B"} and not row),
                 },
             )
 
