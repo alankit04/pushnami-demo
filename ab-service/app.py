@@ -100,6 +100,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json(400, {"error": "visitor_id is required"})
             if preferred_variant and preferred_variant not in {"A", "B"}:
                 return self._send_json(400, {"error": "preferred_variant must be A or B"})
+            if not visitor_id:
+                return self._send_json(400, {"error": "visitor_id is required"})
 
             cfg = config_dict()
             with closing(get_conn()) as conn:
@@ -118,6 +120,11 @@ class Handler(BaseHTTPRequestHandler):
                             if not cfg.get("experimentEnabled", True)
                             else choose_variant(visitor_id)
                         )
+                    variant = (
+                        "A"
+                        if not cfg.get("experimentEnabled", True)
+                        else choose_variant(visitor_id)
+                    )
                     conn.execute(
                         "INSERT INTO assignments(visitor_id, variant) VALUES (?, ?)",
                         (visitor_id, variant),
