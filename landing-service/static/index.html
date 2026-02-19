@@ -107,6 +107,13 @@
       }
       .btn:hover { transform: translateY(-2px); filter: brightness(1.05); }
       .btn:active { transform: translateY(0); }
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid rgba(148,163,184,.45);
+        color: #dbeafe;
+        box-shadow: none;
+      }
+      .btn-secondary:hover { border-color: rgba(34,211,238,.6); }
 
       .form-row {
         display: flex;
@@ -178,9 +185,14 @@
           </article>
           <article class="card fade-in delay-2">
             <h3>Action</h3>
-            <a id="ctaLink" href="https://example.com/start" target="_blank" rel="noreferrer">
-              <button class="btn" id="ctaBtn">Start Free Trial</button>
-            </a>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+              <a id="ctaLink" href="https://example.com/start" target="_blank" rel="noreferrer">
+                <button class="btn" id="ctaBtn">Start Free Trial</button>
+              </a>
+              <a id="adminLink" href="http://localhost:8081" target="_blank" rel="noreferrer">
+                <button class="btn btn-secondary" id="adminBtn" type="button">Open Admin Dashboard</button>
+              </a>
+            </div>
           </article>
         </div>
       </header>
@@ -253,6 +265,11 @@
         document.getElementById('ctaBtn').addEventListener('click', async () => {
           await trackEvent('cta_click', variant);
           showToast('CTA click tracked');
+        });
+
+        document.getElementById('adminBtn').addEventListener('click', async () => {
+          await trackEvent('admin_nav_click', variant);
+          showToast('Opening admin dashboard');
         });
 
         const form = document.getElementById('signupForm');
