@@ -8,6 +8,10 @@ from urllib.parse import parse_qs, urlparse
 DB_PATH = os.getenv("DB_PATH", "/data/metrics.sqlite")
 PORT = int(os.getenv("PORT", "5001"))
 MAX_EVENTS_RESPONSE = int(os.getenv("MAX_EVENTS_RESPONSE", "200"))
+from urllib.parse import urlparse
+
+DB_PATH = os.getenv("DB_PATH", "/data/metrics.sqlite")
+PORT = int(os.getenv("PORT", "5001"))
 
 
 def get_conn():
@@ -54,12 +58,14 @@ def build_filters(query):
 def compute_stats(query):
     where_sql, params, variant_filter, event_type_filter = build_filters(query)
 
+def compute_stats():
     with closing(get_conn()) as conn:
         by_variant = [
             dict(row)
             for row in conn.execute(
                 f"SELECT variant, COUNT(*) AS count FROM events {where_sql} GROUP BY variant ORDER BY variant",
                 params,
+                "SELECT variant, COUNT(*) AS count FROM events GROUP BY variant ORDER BY variant"
             ).fetchall()
         ]
         by_event = [
@@ -67,6 +73,7 @@ def compute_stats(query):
             for row in conn.execute(
                 f"SELECT event_type, COUNT(*) AS count FROM events {where_sql} GROUP BY event_type ORDER BY event_type",
                 params,
+                "SELECT event_type, COUNT(*) AS count FROM events GROUP BY event_type ORDER BY event_type"
             ).fetchall()
         ]
         matrix = [
@@ -93,6 +100,12 @@ def compute_stats(query):
                 LIMIT ?
                 """,
                 [*params, MAX_EVENTS_RESPONSE],
+                """
+                SELECT variant, event_type, COUNT(*) AS count
+                FROM events
+                GROUP BY variant, event_type
+                ORDER BY variant, event_type
+                """
             ).fetchall()
         ]
 
@@ -155,6 +168,7 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/stats":
             query = parse_qs(parsed.query)
             return self._send_json(200, compute_stats(query))
+            return self._send_json(200, compute_stats())
         return self._send_json(404, {"error": "not found"})
 
     def do_POST(self):
@@ -180,6 +194,9 @@ class Handler(BaseHTTPRequestHandler):
                     str(payload["visitor_id"]).strip(),
                     str(payload["variant"]).strip(),
                     str(payload["event_type"]).strip(),
+                    payload["visitor_id"],
+                    payload["variant"],
+                    payload["event_type"],
                     json.dumps(payload.get("metadata", {})),
                 ),
             )

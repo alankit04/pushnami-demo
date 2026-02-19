@@ -197,6 +197,8 @@
 
       async function loadStats() {
         const res = await fetch(`${METRICS_URL}/stats${getStatsFilters()}`);
+      async function loadStats() {
+        const res = await fetch(`${METRICS_URL}/stats`);
         const stats = await res.json();
         updateSummary(stats);
         document.getElementById('statsOutput').textContent = JSON.stringify(stats, null, 2);
