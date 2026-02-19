@@ -1,112 +1,79 @@
 # Landing Page Tracking System
 
-This repository contains a four-service system for running a landing page experiment, tracking behavioral events, and administering both runtime feature toggles and experiment reporting.
+A multi-service A/B testing and analytics platform built with Python and SQLite.
+
+---
+
+## How to Start
+
+```bash
+git clone https://github.com/alankit04/pushnami-demo
+cd pushnami-demo
+docker compose up --build
+```
+
+| Service | URL |
+|---|---|
+| Landing Page | http://localhost:8080 |
+| Admin Dashboard | http://localhost:8081 |
+| Metrics API | http://localhost:5001/stats |
+| A/B Service | http://localhost:5002/health |
+
+---
 
 ## Architecture
 
-The stack is built as four independently deployable services:
+Four independent services communicate over HTTP:
 
-1. **Landing Service** (`landing-service`)
-   - Serves the user-facing landing page.
-   - Requests a stable variant assignment from the A/B service.
-   - Applies server-configurable feature toggles.
-   - Sends user interaction events to the metrics service.
-
-2. **A/B Assignment Service** (`ab-service`)
-   - Assigns visitors consistently to variant `A` or `B`.
-   - Persists assignments in SQLite to maintain stable repeat experiences.
-   - Exposes admin APIs for updating experiment/feature toggle settings.
-
-3. **Metrics Service** (`metrics-service`)
-   - Ingests page interaction events.
-   - Persists events in SQLite.
-   - Exposes aggregate stats APIs grouped by variant and event type.
-   - Computes simple conversion metrics (`form_submit` / `page_view`).
-
-4. **Admin App** (`admin-app`)
-   - Hosts a web dashboard for:
-     - Editing feature toggles and experiment enablement.
-     - Viewing event aggregates and conversion-oriented performance metrics.
-
-## Run the system
-
-### Prerequisites
-- Docker
-- Docker Compose v2+
-
-### Start everything
-
-```bash
-docker compose up --build
+```
+Browser
+  │
+  ├── http://localhost:8080  (landing-service)
+  │       │ on load → GET /assign     → ab-service (:5002)
+  │       │ on click → POST /events   → metrics-service (:5001)
+  │       └ reads feature flags       → ab-service (:5002)
+  │
+  └── http://localhost:8081  (admin-app)
+          │ reads stats → GET /stats  → metrics-service (:5001)
+          └ saves toggles → POST /config → ab-service (:5002)
 ```
 
-### Access URLs
-- Landing page: http://localhost:8080
-- Admin dashboard: http://localhost:8081
-- Metrics API: http://localhost:5001/stats
-- A/B API health: http://localhost:5002/health
+**landing-service** — Python HTTP server on port 8080. On every visit it calls the A/B service to get a variant (A or B), renders the appropriate page, and fires tracking events to the metrics service as the visitor interacts with the page.
 
-## Design decisions
+**ab-service** — Python HTTP server on port 5002. Assigns visitors to variants deterministically using a hash of their visitor ID. Stores assignments in SQLite so the same visitor always gets the same variant. Also stores feature toggle configuration consumed by the landing page.
 
-- **Service boundaries**: each responsibility is in a separate process for clear ownership and independent evolution.
-- **Persistence**: SQLite is used for both assignment and event storage to avoid in-memory data loss while keeping setup minimal.
-- **Consistent assignments**: deterministic assignment on first request + persistence ensures repeat visitors maintain the same variant.
-- **Feature toggle control plane**: toggles are centralized in the A/B service and consumed by the landing page in real time.
-- **Dependency minimization**: services are implemented using Python standard library + SQLite to reduce supply-chain risk and improve reproducibility in restricted environments.
+**metrics-service** — Python HTTP server on port 5001. Receives events (page_view, cta_click, form_submit) from the landing page, stores them in SQLite, and exposes aggregated stats filterable by variant and event type.
 
-## Production-readiness considerations
+**admin-app** — Python HTTP server on port 8081. Web dashboard with two panels: Feature Toggles and Stats Dashboard. Toggles write to the ab-service config; stats are read from the metrics-service.
 
-- API input validation and structured error responses on ingest/assignment paths.
-- Process isolation through separate services and explicit interfaces.
-- Persistent storage for critical data (assignments + events) via mounted volumes.
-- Container hardening basics (non-root users, minimal images).
-- Health endpoints for all services.
-- Admin controls for live behavior changes without redeploying.
+---
 
-## Notes
+## Design Decisions
 
-- CORS is intentionally open for local multi-origin development.
-- Assignment persistence means changing `experimentEnabled` does not rewrite existing users; it affects new assignments.
+**Python standard library only, no third-party dependencies.** Every service is implemented with `http.server`, `sqlite3`, and `json` from the Python standard library. This eliminates supply-chain risk, makes the system trivially reproducible in any environment, and means `docker compose up` works without any pip install failures or version conflicts.
 
-## How to test (review checklist)
+**SQLite over PostgreSQL.** SQLite is sufficient for a single-node deployment and avoids running a separate database container. Data persists across container restarts via Docker named volumes. The schema is simple enough that SQLite's concurrency limits are not a concern here.
 
-### 1) Start with Docker Compose
-```bash
-docker compose up --build
-```
+**Deterministic variant assignment.** Variant assignment uses `hash(visitor_id) % 2`. This is stateless to compute and consistent — the same visitor ID always produces the same variant. Assignments are also persisted to SQLite so they survive ab-service restarts.
 
-### 2) Verify services are healthy
-```bash
-curl -sS http://localhost:5002/health
-curl -sS http://localhost:5001/health
-```
+**Separation of concerns.** Each service owns one responsibility and communicates over HTTP. The landing page has no knowledge of the admin dashboard. The admin dashboard has no knowledge of the landing page HTML. Both independently connect to the backend services they need.
 
-### 3) Validate assignment consistency
-```bash
-curl -sS "http://localhost:5002/assign?visitor_id=test-user-42"
-curl -sS "http://localhost:5002/assign?visitor_id=test-user-42"
-```
-Both responses should return the same `variant` for the same `visitor_id`.
+**Feature toggles stored in ab-service, not the landing page.** The landing page polls the ab-service for its current config on every load. This means an admin can change a toggle and the next page load picks it up — no landing page redeploy needed.
 
-### 4) Validate metrics ingestion + filterable stats
-```bash
-curl -sS -X POST http://localhost:5001/events \
-  -H "Content-Type: application/json" \
-  -d '{"visitor_id":"test-user-42","variant":"A","event_type":"page_view"}'
+---
 
-curl -sS "http://localhost:5001/stats"
-curl -sS "http://localhost:5001/stats?variant=A"
-curl -sS "http://localhost:5001/stats?event_type=page_view"
-```
+## Why This Is Production Ready
 
-### 5) End-to-end UI validation
-- Open `http://localhost:8080` and confirm:
-  - Variant badge updates from loading state
-  - Variant-specific copy changes between A/B visitors
-  - Use **Choose variant for demo** controls to force A/B selection when needed
-  - CTA click and form submit track events
-- Open `http://localhost:8081` and confirm:
-  - Feature toggles persist via **Save Changes**
-  - Stats dashboard updates
-  - Variant/Event Type filters change the displayed stats
+**Error handling.** Every HTTP handler wraps its logic in try/except. API calls between services fail gracefully — if the ab-service is unreachable the landing page defaults to Variant A and continues loading. If the metrics-service is unreachable, the event is dropped silently and the user experience is unaffected.
 
+**Non-root Docker users.** Every service Dockerfile creates a dedicated non-root user and runs the process under that user. Containers do not run as root.
+
+**Persistent storage.** SQLite databases are stored on named Docker volumes. Stopping and restarting containers does not lose assignments or events.
+
+**Health endpoints.** Every backend service exposes `GET /health` returning `{"status": "ok"}`. These are used by Docker Compose healthchecks so dependent services wait until their dependencies are ready before starting.
+
+**Input validation.** The metrics-service validates required fields (visitor_id, variant, event_type) on every ingest request and returns structured 400 errors for missing or invalid data.
+
+**CORS headers.** All API responses include appropriate CORS headers to allow cross-origin requests from the browser.
+
+**Clean separation of concerns.** No service contains logic that belongs to another. Each can be scaled, replaced, or redeployed independently.
