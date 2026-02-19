@@ -103,6 +103,7 @@ curl -sS "http://localhost:5001/stats?event_type=page_view"
 - Open `http://localhost:8080` and confirm:
   - Variant badge updates from loading state
   - Variant-specific copy changes between A/B visitors
+  - Use **Choose variant for demo** controls to force A/B selection when needed
   - CTA click and form submit track events
 - Open `http://localhost:8081` and confirm:
   - Feature toggles persist via **Save Changes**

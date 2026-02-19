@@ -177,6 +177,12 @@
         <h1 id="headline">Welcome to the smarter growth engine</h1>
         <p id="valueProp" class="subtitle">Fast setup, measurable results, and no code required.</p>
         <p class="badge">Variant <strong id="variant">loading…</strong></p>
+        <div style="margin-top:.8rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <span style="font-size:.9rem;color:var(--muted);">Choose variant for demo:</span>
+          <button class="btn btn-secondary" id="variantABtn" type="button">Use Variant A</button>
+          <button class="btn btn-secondary" id="variantBBtn" type="button">Use Variant B</button>
+          <button class="btn btn-secondary" id="variantAutoBtn" type="button">Auto Assign</button>
+        </div>
 
         <div class="grid">
           <article class="card fade-in delay-1" id="promoSection">
@@ -221,6 +227,17 @@
         setTimeout(() => toast.classList.remove('show'), 1300);
       }
 
+      function getPreferredVariant() {
+        return localStorage.getItem('preferredVariant') || "";
+      }
+
+      function setPreferredVariant(value) {
+        if (value) localStorage.setItem('preferredVariant', value);
+        else localStorage.removeItem('preferredVariant');
+        localStorage.removeItem('visitorId');
+        location.reload();
+      }
+
       function getVisitorId() {
         const existing = localStorage.getItem('visitorId');
         if (existing) return existing;
@@ -240,7 +257,7 @@
       async function init() {
         const visitorId = getVisitorId();
         const [assignmentRes, configRes] = await Promise.all([
-          fetch(`${AB_URL}/assign?visitor_id=${encodeURIComponent(visitorId)}`),
+          fetch(`${AB_URL}/assign?visitor_id=${encodeURIComponent(visitorId)}${getPreferredVariant() ? `&preferred_variant=${getPreferredVariant()}` : ""}`),
           fetch(`${AB_URL}/config`),
         ]);
 
@@ -261,6 +278,10 @@
         if (config.alternateCtaDestination) document.getElementById('ctaLink').href = 'https://example.com/pricing';
 
         await trackEvent('page_view', variant);
+
+        document.getElementById('variantABtn').addEventListener('click', () => setPreferredVariant('A'));
+        document.getElementById('variantBBtn').addEventListener('click', () => setPreferredVariant('B'));
+        document.getElementById('variantAutoBtn').addEventListener('click', () => setPreferredVariant(''));
 
         document.getElementById('ctaBtn').addEventListener('click', async () => {
           await trackEvent('cta_click', variant);
